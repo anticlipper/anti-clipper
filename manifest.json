@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "Anti-clipper",
+  "version": "1.0",
+  "description": "Highlight or block YouTube Shorts based on a whitelist/blacklist of channels, to filter out re-uploaders and clippers.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.youtube.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "anti-clipper@preabiancaivan.github.io",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    },
+    "gecko_android": {
+      "strict_min_version": "142.0"
+    }
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Anti-clipper",
+    "default_icon": {
+      "128": "icon128-on.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icon128.png"],
+      "matches": ["https://www.youtube.com/*"]
+    }
+  ],
+  "icons": {
+    "128": "icon128.png"
+  }
+}

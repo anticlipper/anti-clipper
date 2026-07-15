@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Anti-clipper</title>
+<style>
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    width: 320px;
+    padding: 12px;
+    background: #0f0f0f;
+    color: #f1f1f1;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  header img { width: 22px; height: 22px; }
+  h1 { font-size: 14px; margin: 0; flex: 1; }
+  h2 { font-size: 12px; margin: 14px 0 6px; color: #ccc; }
+  .row { display: flex; gap: 6px; margin-bottom: 6px; }
+  input[type="text"] {
+    flex: 1;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid #333;
+    background: #1e1e1e;
+    color: #fff;
+  }
+  button {
+    padding: 6px 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  button.add-white { background: #2ecc71; color: #062; }
+  button.add-black { background: #e74c3c; color: #fff; }
+  button.remove {
+    background: #333;
+    color: #fff;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: normal;
+  }
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute;
+    inset: 0;
+    background: #e74c3c;
+    border-radius: 20px;
+    transition: background 0.15s;
+    cursor: pointer;
+  }
+  .slider::before {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    left: 3px;
+    top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.15s;
+  }
+  .switch input:checked + .slider { background: #2ecc71; }
+  .switch input:checked + .slider::before { transform: translateX(16px); }
+  #toggleLabel {
+    font-size: 10px;
+    font-weight: bold;
+    color: #2ecc71;
+    width: 22px;
+    text-align: right;
+  }
+  body.off #toggleLabel { color: #e74c3c; }
+  body.off #viewHome,
+  body.off #viewList {
+    filter: blur(1.5px) grayscale(1);
+    opacity: 0.55;
+    pointer-events: none;
+    user-select: none;
+  }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid #222;
+    font-size: 13px;
+  }
+  .tag-white { color: #2ecc71; }
+  .tag-black { color: #e74c3c; }
+
+  #topBlocked li { justify-content: flex-start; gap: 8px; padding: 6px 0; }
+  #topBlocked .rank { color: #888; width: 14px; }
+  #topBlocked .handle {
+    flex: 1;
+    color: #e74c3c;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #topBlocked .count { color: #888; font-size: 11px; }
+  .empty { color: #888; font-size: 12px; padding: 8px 0; }
+
+  .nav-row { margin-top: 12px; display: flex; gap: 6px; }
+  .nav-row button { flex: 1; font-size: 12px; }
+  #showBlackBtn { background: #241110; color: #e74c3c; border: 1px solid #5c2320; }
+  #showWhiteBtn { background: #0e1f16; color: #2ecc71; border: 1px solid #1e5c3a; }
+  #backBtn { background: #333; color: #fff; font-size: 12px; margin-bottom: 10px; }
+
+  #listItems { max-height: 240px; overflow-y: auto; }
+
+  .io-row {
+    margin-top: 14px;
+    border-top: 1px solid #333;
+    padding-top: 10px;
+    display: flex;
+    gap: 6px;
+  }
+  .io-row button {
+    flex: 1;
+    background: #1e1e1e;
+    border: 1px solid #444;
+    color: #ddd;
+    font-size: 12px;
+    font-weight: normal;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .io-row button:hover { border-color: #666; color: #fff; }
+  .io-row svg { flex-shrink: 0; }
+  small { color: #888; font-size: 10px; display: block; margin-top: 8px; }
+  #importFile { display: none; }
+  .repo-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    margin-top: 10px;
+    color: #888;
+    font-size: 10px;
+    text-decoration: none;
+  }
+  .repo-link:hover { color: #fff; }
+</style>
+</head>
+<body>
+  <header>
+    <img src="icon128.png" alt="" />
+    <h1>Anti-clipper</h1>
+    <span id="toggleLabel">ON</span>
+    <label class="switch" title="Enable or disable all filters">
+      <input type="checkbox" id="enabledToggle" />
+      <span class="slider"></span>
+    </label>
+  </header>
+
+  <div id="viewHome">
+    <h2>Top blocked channels (this session)</h2>
+    <ul id="topBlocked"></ul>
+
+    <div class="nav-row">
+      <button id="showBlackBtn">Blacklist</button>
+      <button id="showWhiteBtn">Whitelist</button>
+    </div>
+
+    <div class="io-row">
+      <button id="exportBtn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export lists
+      </button>
+      <button id="importBtn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Import lists
+      </button>
+      <input type="file" id="importFile" accept="application/json" />
+    </div>
+
+    <small>Counters reset when the browser closes. Export saves both lists in a single file; Import merges a file's lists into your current ones.</small>
+
+    <a class="repo-link" href="https://github.com/anticlipper/anti-clipper" target="_blank" rel="noopener">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+      Source code on GitHub
+    </a>
+  </div>
+
+  <div id="viewList" hidden>
+    <button id="backBtn">← Back</button>
+    <h2 id="listTitle"></h2>
+    <div class="row">
+      <input type="text" id="listInput" placeholder="@channelname" />
+      <button id="listAddBtn">Add</button>
+    </div>
+    <ul id="listItems"></ul>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
