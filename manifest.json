@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Anti-clipper",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Highlight or block YouTube Shorts based on a whitelist/blacklist of channels, to filter out re-uploaders and clippers.",
   "permissions": ["storage"],
   "host_permissions": [
-    "https://www.youtube.com/*"
+    "https://www.youtube.com/*",
+    "https://raw.githubusercontent.com/*"
   ],
   "background": {
     "service_worker": "background.js",

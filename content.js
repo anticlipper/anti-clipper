@@ -42,8 +42,11 @@ function cardId(card) {
 }
 
 const STATE = {
-  whitelist: new Set(),
+  whitelist: new Set(), // user's own lists (storage.sync) - always win
   blacklist: new Set(),
+  communityWhitelist: new Set(), // curated list from GitHub (storage.local)
+  communityBlacklist: new Set(),
+  communityEnabled: true,
   enabled: true,
 };
 
@@ -52,15 +55,46 @@ function normalizeHandle(raw) {
   return raw.trim().toLowerCase().replace(/^@/, "");
 }
 
+// Combined verdicts. The user's own lists always override the community
+// list: a channel the user whitelisted is never blocked, a channel the
+// user blacklisted is always blocked.
+function isBlocked(handle) {
+  if (STATE.whitelist.has(handle)) return false;
+  if (STATE.blacklist.has(handle)) return true;
+  return STATE.communityEnabled && STATE.communityBlacklist.has(handle);
+}
+
+function isOfficial(handle) {
+  if (STATE.blacklist.has(handle)) return false;
+  if (STATE.whitelist.has(handle)) return true;
+  return STATE.communityEnabled && STATE.communityWhitelist.has(handle);
+}
+
+function applyCommunityList(list) {
+  STATE.communityWhitelist = new Set(((list && list.whitelist) || []).map(normalizeHandle));
+  STATE.communityBlacklist = new Set(((list && list.blacklist) || []).map(normalizeHandle));
+}
+
 function loadSettings() {
-  return new Promise((resolve) => {
-    chrome.storage.sync.get(["whitelist", "blacklist", "enabled"], (data) => {
-      STATE.whitelist = new Set((data.whitelist || []).map(normalizeHandle));
-      STATE.blacklist = new Set((data.blacklist || []).map(normalizeHandle));
-      STATE.enabled = data.enabled !== false;
+  const syncReady = new Promise((resolve) => {
+    chrome.storage.sync.get(
+      ["whitelist", "blacklist", "enabled", "communityEnabled"],
+      (data) => {
+        STATE.whitelist = new Set((data.whitelist || []).map(normalizeHandle));
+        STATE.blacklist = new Set((data.blacklist || []).map(normalizeHandle));
+        STATE.enabled = data.enabled !== false;
+        STATE.communityEnabled = data.communityEnabled !== false;
+        resolve();
+      }
+    );
+  });
+  const localReady = new Promise((resolve) => {
+    chrome.storage.local.get(["communityList"], (data) => {
+      applyCommunityList(data.communityList);
       resolve();
     });
   });
+  return Promise.all([syncReady, localReady]);
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -75,6 +109,14 @@ chrome.storage.onChanged.addListener((changes, area) => {
       STATE.enabled = changes.enabled.newValue !== false;
       dbg("filters", STATE.enabled ? "ENABLED" : "DISABLED");
     }
+    if (changes.communityEnabled) {
+      STATE.communityEnabled = changes.communityEnabled.newValue !== false;
+      dbg("community list", STATE.communityEnabled ? "ENABLED" : "DISABLED");
+    }
+  }
+  if (area === "local" && changes.communityList) {
+    applyCommunityList(changes.communityList.newValue);
+    dbg("community list updated");
   }
 });
 
@@ -367,7 +409,7 @@ function tickCard(card) {
     handle = HANDLE_CACHE.get(activeId);
     enforceable = true; // authoritative: id comes from the URL, not the DOM
 
-    if (handle && STATE.blacklist.has(handle)) {
+    if (handle && isBlocked(handle)) {
       recordBlockEvent(handle);
       if (AUTO_SKIP) attemptAutoSkip(activeId);
     }
@@ -380,7 +422,7 @@ function tickCard(card) {
     // (e.g. right after blocking a channel via the badge button). Stop as
     // soon as the video actually plays; a manual pause always happens
     // with currentTime > 0.05, so it is never overridden.
-    if (handle && !STATE.blacklist.has(handle) && kickstartDeadline) {
+    if (handle && !isBlocked(handle) && kickstartDeadline) {
       const v = card.querySelector("video");
       if (v && (!v.paused || v.currentTime > 0.05)) {
         kickstartDeadline = 0; // playing (or user is past the start): done
@@ -405,8 +447,8 @@ function tickCard(card) {
     if (!handle) return;
   }
 
-  const isBlacklisted = STATE.blacklist.has(handle);
-  const isWhitelisted = STATE.whitelist.has(handle);
+  const isBlacklisted = isBlocked(handle);
+  const isWhitelisted = isOfficial(handle);
 
   // Blacklist badge + overlay
   if (isBlacklisted) {
@@ -519,7 +561,7 @@ function tickAll() {
     const activeId = getActiveShortId();
     const activeClean =
       !activeId ||
-      (HANDLE_CACHE.has(activeId) && !STATE.blacklist.has(HANDLE_CACHE.get(activeId)));
+      (HANDLE_CACHE.has(activeId) && !isBlocked(HANDLE_CACHE.get(activeId)));
     if ((video.currentSrc || "") !== video.dataset.ocfBlockedSrc || activeClean) {
       recoverVideo(video, "orphan");
     }

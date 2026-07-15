@@ -121,6 +121,29 @@
 
   #listItems { max-height: 240px; overflow-y: auto; }
 
+  .community {
+    margin-top: 14px;
+    border-top: 1px solid #333;
+    padding-top: 10px;
+  }
+  .community-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .community-title { font-size: 12px; color: #ccc; }
+  .community-info { color: #888; font-size: 11px; margin-top: 4px; }
+  body.community-off .community-info { opacity: 0.55; }
+  #communityUpdateBtn {
+    width: 100%;
+    margin-top: 8px;
+    background: #0e1f16;
+    color: #2ecc71;
+    border: 1px solid #1e5c3a;
+    font-size: 12px;
+  }
+  #communityUpdateBtn:disabled { opacity: 0.6; cursor: default; }
+
   .io-row {
     margin-top: 14px;
     border-top: 1px solid #333;
@@ -175,6 +198,18 @@
     <div class="nav-row">
       <button id="showBlackBtn">Blacklist</button>
       <button id="showWhiteBtn">Whitelist</button>
+    </div>
+
+    <div class="community">
+      <div class="community-head">
+        <span class="community-title">Community list</span>
+        <label class="switch" title="Enable or disable the community list">
+          <input type="checkbox" id="communityToggle" />
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="community-info" id="communityInfo">Not installed yet.</div>
+      <button id="communityUpdateBtn" hidden>Update community list</button>
     </div>
 
     <div class="io-row">

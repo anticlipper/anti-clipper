@@ -17,6 +17,9 @@ const els = {
   listAddBtn: document.getElementById("listAddBtn"),
   listItems: document.getElementById("listItems"),
   enabledToggle: document.getElementById("enabledToggle"),
+  communityToggle: document.getElementById("communityToggle"),
+  communityInfo: document.getElementById("communityInfo"),
+  communityUpdateBtn: document.getElementById("communityUpdateBtn"),
 };
 
 let currentKey = null; // "whitelist" | "blacklist" while the list view is open
@@ -37,6 +40,52 @@ els.enabledToggle.addEventListener("change", () => {
   applyEnabledUI(enabled);
 });
 
+// ---- Community list: toggle, status line, update button ----
+function renderCommunity() {
+  chrome.storage.local.get(["communityList", "communityUpdateAvailable"], (data) => {
+    const list = data.communityList;
+    if (list) {
+      const parts = [list.blacklist.length + " blocked"];
+      if (list.whitelist.length > 0) parts.push(list.whitelist.length + " official");
+      els.communityInfo.textContent =
+        parts.join(", ") + " channels (rev " + list.revision + ")";
+    } else {
+      els.communityInfo.textContent = "Not installed yet.";
+    }
+    els.communityUpdateBtn.hidden = !data.communityUpdateAvailable;
+  });
+}
+
+chrome.storage.sync.get(["communityEnabled"], (data) => {
+  const on = data.communityEnabled !== false;
+  els.communityToggle.checked = on;
+  document.body.classList.toggle("community-off", !on);
+});
+els.communityToggle.addEventListener("change", () => {
+  const on = els.communityToggle.checked;
+  chrome.storage.sync.set({ communityEnabled: on });
+  document.body.classList.toggle("community-off", !on);
+});
+
+els.communityUpdateBtn.addEventListener("click", () => {
+  els.communityUpdateBtn.disabled = true;
+  els.communityUpdateBtn.textContent = "Updating...";
+  chrome.runtime.sendMessage({ type: "community-apply-update" }, (res) => {
+    els.communityUpdateBtn.disabled = false;
+    els.communityUpdateBtn.textContent = "Update community list";
+    if (!res || !res.ok) {
+      els.communityInfo.textContent = "Update failed. Check your connection and retry.";
+      return;
+    }
+    renderCommunity();
+  });
+});
+
+// Opening the popup also triggers a (throttled) check for a newer list.
+chrome.runtime.sendMessage({ type: "community-check" }, (res) => {
+  if (res && res.updateAvailable) renderCommunity();
+});
+
 // ---- Live updates while the popup stays open ----
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "session" && changes.blockStats && !els.viewHome.hidden) {
@@ -51,6 +100,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   if (area === "sync" && changes.enabled) {
     applyEnabledUI(changes.enabled.newValue !== false);
+  }
+  if (area === "local" && (changes.communityList || changes.communityUpdateAvailable)) {
+    renderCommunity();
   }
 });
 
@@ -174,7 +226,7 @@ els.exportBtn.addEventListener("click", () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "anti-clipper-lists.json";
+    a.download = "anti-clipper-my-lists.json";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -215,3 +267,4 @@ els.importFile.addEventListener("change", (e) => {
 });
 
 renderHome();
+renderCommunity();
